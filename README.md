@@ -14,6 +14,31 @@ cargo build --release
 
 Then the executable will be under `target/release/pdf2png`.
 
+# Help from `pdf2png -h`
+
+```json
+Convert a PDF to image files, one image file per PDF page. It uses a default target width/height of 2000px per resulting image. This overrides existing image files in the output directory. Prints the PDF page count to stdout
+
+Usage: pdf2png [OPTIONS] <PDF_PATH>
+
+Arguments:
+  <PDF_PATH>  The PDF file to convert to images
+
+Options:
+  -p, --password <PASSWORD>
+          The PDF password
+      --prefix <PREFIX>
+          The file prefix of the PNG files meaning the "foo" part for "foo-0.png" when converting "foo.pdf". The prefix can be changed here. If missing, the file name without the extension from the PDF file is taken
+  -o, --output-directory <OUTPUT_DIRECTORY>
+          The output directory where all the image files are saved to [default: .]
+  -l, --library-directory <LIBRARY_DIRECTORY>
+          The directory which contains the libpdfium.dylib file [default: .]
+  -r, --resolution-pixels <RESOLUTION_PIXELS>
+          The target width and height pixel size. The width and height of the PNG files will not exceed this value [default: 2000]
+  -h, --help
+          Print help
+```
+
 # Notes
 
 - converting to PNGs is faster than JPEGs, so PNGs are used
