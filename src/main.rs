@@ -24,7 +24,7 @@ struct Args {
     #[clap(long, short, value_parser = clap::value_parser ! (ClioPath).exists().is_dir(), default_value = ".")]
     library_directory: ClioPath,
 
-    /// The max target width and height size. No side will exceed this value.
+    /// The target width and height pixel size. The width and height of the PNG files will not exceed this value.
     #[arg(short, long, default_value_t = 2000)]
     resolution_pixels: u16,
 }

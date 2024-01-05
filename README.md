@@ -4,7 +4,7 @@ I created this since this implementation with Rust is about 2x times faster than
 
 Only tested on macOS 14.0.
 
-Download the libpdfium.dylib file from https://github.com/bblanchon/pdfium-binaries and add it next to the compiled binary
+Download the `libpdfium.dylib` file from https://github.com/bblanchon/pdfium-binaries and add it next to the compiled `pdf2png` binary or specify `--library-directory`.
 
 # Compile
 
