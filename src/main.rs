@@ -2,8 +2,6 @@ use clap::Parser;
 use clio::{ClioPath, Input};
 use pdfium_render::prelude::*;
 
-// TODO use png or jpeg, which is faster? detail in readme what choice
-
 /// Convert a PDF to image files, one image file per PDF page.
 /// It uses a default target width/height of 2000px per resulting image.
 /// This overrides existing image files in the output directory.
@@ -46,16 +44,14 @@ fn main() {
         .set_target_width(args.resolution_pixels as Pixels)
         .set_maximum_height(args.resolution_pixels as Pixels)
         .rotate_if_landscape(PdfPageRenderRotation::Degrees90, true);
-    // render each page to a bitmap image, saving each image to a JPEG file
+    // render each page to a bitmap image, saving each image to a PNG file
     for (index, page) in document.pages().iter().enumerate() {
-        let to_path = args.output_directory.path().join(format!("test-page-{}.jpg", index));
-        // let to_path = args.output_directory.path().join(format!("test-page-{}.png", index));
+        let to_path = args.output_directory.path().join(format!("test-page-{}.png", index));
         page.render_with_config(&render_config).unwrap()
             .as_image() // renders this page to an image::DynamicImage
             .as_rgba8() // convert to an image::Image
             .ok_or(PdfiumError::ImageError).unwrap()
-            .save_with_format(to_path, image::ImageFormat::Jpeg)
-            // .save_with_format(to_path, image::ImageFormat::Png)
+            .save_with_format(to_path, image::ImageFormat::Png)
             .map_err(|_| PdfiumError::ImageError).unwrap();
     }
     print!("{}", document.pages().len());
