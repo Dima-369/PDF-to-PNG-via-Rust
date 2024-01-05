@@ -16,7 +16,7 @@ Then the executable will be under `target/release/pdf2png`.
 
 # Help from `pdf2png -h`
 
-```json
+```
 Convert a PDF to image files, one image file per PDF page. It uses a default target width/height of 2000px per resulting image. This overrides existing image files in the output directory. Prints the PDF page count to stdout
 
 Usage: pdf2png [OPTIONS] <PDF_PATH>
