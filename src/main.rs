@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use clap::Parser;
 use clio::{ClioPath, Input};
 use pdfium_render::prelude::*;
@@ -16,12 +18,17 @@ struct Args {
     #[arg(short, long)]
     password: Option<String>,
 
+    /// The file prefix of the PNG files meaning the "foo" part for "foo-0.png" when converting "foo.pdf".
+    /// The prefix can be changed here. If missing, the file name without the extension from the PDF file is taken.
+    #[arg(long)]
+    prefix: Option<String>,
+
     /// The output directory where all the image files are saved to.
-    #[clap(long, short, value_parser = clap::value_parser ! (ClioPath).exists().is_dir(), default_value = ".")]
+    #[clap(short, long, value_parser = clap::value_parser ! (ClioPath).exists().is_dir(), default_value = ".")]
     output_directory: ClioPath,
 
-    /// The directory to the libpdfium.dylib file.
-    #[clap(long, short, value_parser = clap::value_parser ! (ClioPath).exists().is_dir(), default_value = ".")]
+    /// The directory which contains the libpdfium.dylib file.
+    #[clap(short, long, value_parser = clap::value_parser ! (ClioPath).exists().is_dir(), default_value = ".")]
     library_directory: ClioPath,
 
     /// The target width and height pixel size. The width and height of the PNG files will not exceed this value.
@@ -29,30 +36,46 @@ struct Args {
     resolution_pixels: u16,
 }
 
-/// Renders each page in the PDF file at the given path to a separate JPEG file.
+fn get_prefix(pdf_path: &Path, args: &Args) -> String {
+    if let Some(prefix) = &args.prefix {
+        return prefix.clone();
+    }
+    let extension = pdf_path.extension();
+    let pdf_path_str: &str = pdf_path.file_name().unwrap().to_str().unwrap();
+    if let Some(ext) = extension {
+        pdf_path_str[..pdf_path_str.len() - (ext.len() + 1)].to_string()
+    } else {
+        pdf_path_str.to_string()
+    }
+}
+
+/// Renders each page in the PDF file at the given path to a separate PNG file.
 ///  Bind to a Pdfium library in the same directory as our Rust executable;
 /// failing that, fall back to using a Pdfium library provided by the operating system.
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let pdfium = Pdfium::new(
         Pdfium::bind_to_library(
             Pdfium::pdfium_platform_library_name_at_path(args.library_directory.path()))
-            .or_else(|_| Pdfium::bind_to_system_library()).unwrap(),
+            .or_else(|_| Pdfium::bind_to_system_library())?,
     );
-    let document = pdfium.load_pdf_from_file(args.pdf_path.path().path(), args.password.as_deref()).unwrap();
+    let pdf_path = args.pdf_path.path().path();
+    let document = pdfium.load_pdf_from_file(pdf_path, args.password.as_deref()).unwrap();
     let render_config = PdfRenderConfig::new()
         .set_target_width(args.resolution_pixels as Pixels)
         .set_maximum_height(args.resolution_pixels as Pixels)
         .rotate_if_landscape(PdfPageRenderRotation::Degrees90, true);
+    let prefix = get_prefix(pdf_path, &args);
     // render each page to a bitmap image, saving each image to a PNG file
     for (index, page) in document.pages().iter().enumerate() {
-        let to_path = args.output_directory.path().join(format!("test-page-{}.png", index));
-        page.render_with_config(&render_config).unwrap()
+        let to_path = args.output_directory.path().join(format!("{}-{}.png", prefix, index));
+        page.render_with_config(&render_config)?
             .as_image() // renders this page to an image::DynamicImage
             .as_rgba8() // convert to an image::Image
-            .ok_or(PdfiumError::ImageError).unwrap()
+            .ok_or(PdfiumError::ImageError)?
             .save_with_format(to_path, image::ImageFormat::Png)
-            .map_err(|_| PdfiumError::ImageError).unwrap();
+            .map_err(|_| PdfiumError::ImageError)?;
     }
     print!("{}", document.pages().len());
+    Ok(())
 }
