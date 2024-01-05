@@ -1,5 +1,5 @@
 [package]
-name = "pdf2jpeg"
+name = "pdf2png"
 authors = ["Dmytro (Dima) Butemann <dbutemann@gmail.com>"]
 version = "1.0.0"
 edition = "2021"
