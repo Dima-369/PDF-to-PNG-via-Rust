@@ -25,6 +25,8 @@ Arguments:
   <PDF_PATH>  The PDF file to convert to images
 
 Options:
+  -f, --first-page-only
+          Convert only first page without adding -0 suffix and do not print page count to stdout
   -p, --password <PASSWORD>
           The PDF password
       --prefix <PREFIX>
@@ -34,7 +36,7 @@ Options:
   -l, --library-directory <LIBRARY_DIRECTORY>
           The directory which contains the libpdfium.dylib file [default: .]
   -r, --resolution-pixels <RESOLUTION_PIXELS>
-          The target width and height pixel size. The width and height of the PNG files will not exceed this value [default: 2000]
+          The target width and maximum height in pixels. The width and height of the PNG files will not exceed this value [default: 2000]
   -h, --help
           Print help
 ```

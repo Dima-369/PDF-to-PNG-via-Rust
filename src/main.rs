@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::process::exit;
 
+use clap::ArgAction;
 use clap::Parser;
 use clio::{ClioPath, Input};
 use pdfium_render::error::PdfiumError::PdfiumLibraryInternalError;
@@ -14,6 +15,10 @@ use pdfium_render::prelude::PdfiumInternalError::PasswordError;
 /// If the PDF is password protected or if the password is incorrect, exit with code 3.
 #[derive(Parser, Debug)]
 struct Args {
+    /// Convert only first page without adding -0 suffix and do not print page count to stdout.
+    #[clap(short, long, action = ArgAction::SetTrue)]
+    first_page_only: bool,
+
     /// The PDF file to convert to images.
     #[clap(value_parser)]
     pdf_path: Input,
@@ -35,7 +40,7 @@ struct Args {
     #[clap(short, long, value_parser = clap::value_parser ! (ClioPath).exists().is_dir(), default_value = ".")]
     library_directory: ClioPath,
 
-    /// The target width and height pixel size. The width and height of the PNG files will not exceed this value.
+    /// The target width and maximum height in pixels. The width and height of the PNG files will not exceed this value.
     #[arg(short, long, default_value_t = 2000)]
     resolution_pixels: u16,
 }
@@ -87,6 +92,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or(PdfiumError::ImageError)?
             .save_with_format(to_path, image::ImageFormat::Png)
             .map_err(|_| PdfiumError::ImageError)?;
+        if args.first_page_only {
+            return Ok(());
+        }
     }
     print!("{}", document.pages().len());
     Ok(())
