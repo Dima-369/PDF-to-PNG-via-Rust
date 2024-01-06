@@ -53,9 +53,6 @@ fn get_prefix(pdf_path: &Path, args: &Args) -> String {
     }
 }
 
-/// Renders each page in the PDF file at the given path to a separate PNG file.
-///  Bind to a Pdfium library in the same directory as our Rust executable;
-/// failing that, fall back to using a Pdfium library provided by the operating system.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let pdfium = Pdfium::new(
