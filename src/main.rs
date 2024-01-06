@@ -1,13 +1,16 @@
 use std::path::Path;
+use std::process::exit;
 
 use clap::Parser;
 use clio::{ClioPath, Input};
+use pdfium_render::error::PdfiumError::PdfiumLibraryInternalError;
 use pdfium_render::prelude::*;
+use pdfium_render::prelude::PdfiumInternalError::PasswordError;
 
 /// Convert a PDF to image files, one image file per PDF page.
 /// It uses a default target width/height of 2000px per resulting image.
 /// This overrides existing image files in the output directory.
-/// Prints the PDF page count to stdout.
+/// Prints the PDF page count to stdout. If the PDF is password protected, exit with code 3.
 #[derive(Parser, Debug)]
 struct Args {
     /// The PDF file to convert to images.
@@ -60,7 +63,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .or_else(|_| Pdfium::bind_to_system_library())?,
     );
     let pdf_path = args.pdf_path.path().path();
-    let document = pdfium.load_pdf_from_file(pdf_path, args.password.as_deref()).unwrap();
+    let document = match pdfium.load_pdf_from_file(pdf_path, args.password.as_deref()) {
+        Ok(ok) => ok,
+        Err(PdfiumLibraryInternalError(PasswordError)) => {
+            if args.password.is_some() {
+                eprint!("Passed PDF password is incorrect!");
+            } else {
+                eprint!("PDF is password protected!");
+            }
+            exit(3)
+        }
+        Err(e) => panic!("{}", e)
+    };
     let render_config = PdfRenderConfig::new()
         .set_target_width(args.resolution_pixels as Pixels)
         .set_maximum_height(args.resolution_pixels as Pixels)
