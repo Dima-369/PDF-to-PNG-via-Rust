@@ -10,7 +10,8 @@ use pdfium_render::prelude::PdfiumInternalError::PasswordError;
 /// Convert a PDF to image files, one image file per PDF page.
 /// It uses a default target width/height of 2000px per resulting image.
 /// This overrides existing image files in the output directory.
-/// Prints the PDF page count to stdout. If the PDF is password protected, exit with code 3.
+/// Prints the PDF page count to stdout.
+/// If the PDF is password protected or if the password is incorrect, exit with code 3.
 #[derive(Parser, Debug)]
 struct Args {
     /// The PDF file to convert to images.
