@@ -19,6 +19,10 @@ struct Args {
     #[clap(short, long, action = ArgAction::SetTrue)]
     first_page_only: bool,
 
+    /// Print PDF page count to stdout and quit without converting to PNG.
+    #[clap(long, action = ArgAction::SetTrue)]
+    page_count_only: bool,
+
     /// The PDF file to convert to images.
     #[clap(value_parser)]
     pdf_path: Input,
@@ -78,27 +82,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => panic!("{}", e)
     };
-    let render_config = PdfRenderConfig::new()
-        .set_target_width(args.resolution_pixels as Pixels)
-        .set_maximum_height(args.resolution_pixels as Pixels)
-        .rotate_if_landscape(PdfPageRenderRotation::Degrees90, true);
-    let prefix = get_prefix(pdf_path, &args);
-    // render each page to a bitmap image, saving each image to a PNG file
-    for (index, page) in document.pages().iter().enumerate() {
-        let file_name = if args.first_page_only {
-            format!("{}.png", prefix)
-        } else {
-            format!("{}-{}.png", prefix, index)
-        };
-        let final_path = args.output_directory.path().join(file_name);
-        page.render_with_config(&render_config)?
-            .as_image() // renders this page to an image::DynamicImage
-            .as_rgba8() // convert to an image::Image
-            .ok_or(PdfiumError::ImageError)?
-            .save_with_format(final_path, image::ImageFormat::Png)
-            .map_err(|_| PdfiumError::ImageError)?;
-        if args.first_page_only {
-            break;
+    if !args.page_count_only {
+        let render_config = PdfRenderConfig::new()
+            .set_target_width(args.resolution_pixels as Pixels)
+            .set_maximum_height(args.resolution_pixels as Pixels)
+            .rotate_if_landscape(PdfPageRenderRotation::Degrees90, true);
+        let prefix = get_prefix(pdf_path, &args);
+        // render each page to a bitmap image, saving each image to a PNG file
+        for (index, page) in document.pages().iter().enumerate() {
+            let file_name = if args.first_page_only {
+                format!("{}.png", prefix)
+            } else {
+                format!("{}-{}.png", prefix, index)
+            };
+            let final_path = args.output_directory.path().join(file_name);
+            page.render_with_config(&render_config)?
+                .as_image() // renders this page to an image::DynamicImage
+                .as_rgba8() // convert to an image::Image
+                .ok_or(PdfiumError::ImageError)?
+                .save_with_format(final_path, image::ImageFormat::Png)
+                .map_err(|_| PdfiumError::ImageError)?;
+            if args.first_page_only {
+                break;
+            }
         }
     }
     print!("{}", document.pages().len());
