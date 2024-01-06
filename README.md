@@ -26,7 +26,9 @@ Arguments:
 
 Options:
   -f, --first-page-only
-          Convert only first page without adding -0 suffix and do not print page count to stdout
+          Convert only first page without adding -0 suffix and also print page count to stdout
+      --page-count-only
+          Print PDF page count to stdout and quit without converting to PNG
   -p, --password <PASSWORD>
           The PDF password
       --prefix <PREFIX>
