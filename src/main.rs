@@ -85,8 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !args.page_count_only {
         let render_config = PdfRenderConfig::new()
             .set_target_width(args.resolution_pixels as Pixels)
-            .set_maximum_height(args.resolution_pixels as Pixels)
-            .rotate_if_landscape(PdfPageRenderRotation::Degrees90, true);
+            .set_maximum_height(args.resolution_pixels as Pixels);
         let prefix = get_prefix(pdf_path, &args);
         // render each page to a bitmap image, saving each image to a PNG file
         for (index, page) in document.pages().iter().enumerate() {
