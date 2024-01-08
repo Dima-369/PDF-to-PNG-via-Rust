@@ -53,13 +53,19 @@ fn get_prefix(pdf_path: &Path, args: &Args) -> String {
     if let Some(prefix) = &args.prefix {
         return prefix.clone();
     }
-    let extension = pdf_path.extension();
-    let pdf_path_str: &str = pdf_path.file_name().unwrap().to_str().unwrap();
-    if let Some(ext) = extension {
-        pdf_path_str[..pdf_path_str.len() - (ext.len() + 1)].to_string()
-    } else {
-        pdf_path_str.to_string()
-    }
+    let pdf_path_str: &str = pdf_path.file_name()
+        .unwrap_or_else(|| {
+            eprintln!("Passed PDF file path should have file name!");
+            exit(1)
+        })
+        .to_str()
+        .unwrap_or_else(|| {
+            eprintln!("Passed PDF file path can not be converted to a string!");
+            exit(1)
+        });
+    pdf_path.extension().map_or_else(
+            || pdf_path_str.to_string(),
+            |ext| pdf_path_str[..pdf_path_str.len() - (ext.len() + 1)].to_string())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -84,15 +90,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     if !args.page_count_only {
         let render_config = PdfRenderConfig::new()
-            .set_target_width(args.resolution_pixels as Pixels)
-            .set_maximum_height(args.resolution_pixels as Pixels);
+            .set_target_width(i32::from(args.resolution_pixels))
+            .set_maximum_height(i32::from(args.resolution_pixels));
         let prefix = get_prefix(pdf_path, &args);
         // render each page to a bitmap image, saving each image to a PNG file
         for (index, page) in document.pages().iter().enumerate() {
             let file_name = if args.first_page_only {
-                format!("{}.png", prefix)
+                format!("{prefix}.png")
             } else {
-                format!("{}-{}.png", prefix, index)
+                format!("{prefix}-{index}.png")
             };
             let final_path = args.output_directory.path().join(file_name);
             page.render_with_config(&render_config)?
