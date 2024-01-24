@@ -4,7 +4,7 @@ I created this because the implementation in this repository Rust is about 2x fa
 
 On an M1 Macbook, this takes about 700 ms to convert a 5 MB PDF file with 12 pages - but note, this is just a number; this highly depends on PDF and hardware spec. Tested on macOS 14.0.
 
-Download the `libpdfium.dylib` file from https://github.com/bblanchon/pdfium-binaries and add it next to the compiled `pdf2png` binary or specify `--library-directory`.
+Download the `libpdfium.dylib` file from https://github.com/bblanchon/pdfium-binaries and add it next to the compiled `pdf2png` binary or specify `--library-directory`. For the M1/M2 MacBooks, download `pdfium-mac-arm64.tgz`.
 
 # Compile
 
