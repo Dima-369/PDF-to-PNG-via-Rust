@@ -5,8 +5,7 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
-actix-web = "4"
 clap = { version = "4.4.13", features = ["derive"] }
 clio = { version = "0.3.5", features = ["clap-parse"] }
-image = "0.24.7"
+image = "0.25.1"
 pdfium-render = "0.8.17"
