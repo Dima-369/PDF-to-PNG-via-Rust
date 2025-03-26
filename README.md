@@ -19,6 +19,8 @@ Then the executable will be under `target/release/pdf2png`.
 Convert a PDF to image files, one image file per PDF page. It uses a default target width/height of 2000px per resulting image. This overrides existing image files in the output directory. Prints the PDF page count to stdout. If the PDF is password protected, exit with code 3.
 
 ```
+Convert a PDF to image files, one image file per PDF page. It uses a default target width/height of 2000px per resulting image. This overrides existing image files in the output directory. Prints the PDF page count to stdout. If the PDF is password protected or if the password is incorrect, exit with code 3
+
 Usage: pdf2png [OPTIONS] <PDF_PATH>
 
 Arguments:
@@ -29,6 +31,8 @@ Options:
           Convert only first page without adding -0 suffix and also print page count to stdout
       --page-count-only
           Print PDF page count to stdout and quit without converting to PNG
+      --text-only
+          Extract and print text content from the PDF, then exit
   -p, --password <PASSWORD>
           The PDF password
       --prefix <PREFIX>
