@@ -1,14 +1,14 @@
 mod cli;
 
 use clap::Parser;
-use pdfium_render::error::PdfiumError::PdfiumLibraryInternalError;
-use pdfium_render::prelude::*;
+use pdfium_render::prelude::PdfiumError::PdfiumLibraryInternalError;
 use pdfium_render::prelude::PdfiumInternalError::PasswordError;
+use pdfium_render::prelude::*;
 use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Args::parse();
-    
+
     if args.text_only {
         let pdf_path = args.pdf_path.path().path();
         let bytes = fs::read(pdf_path)?;
@@ -18,9 +18,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let pdfium = Pdfium::new(
-        Pdfium::bind_to_library(
-            Pdfium::pdfium_platform_library_name_at_path(args.library_directory.path()))
-            .or_else(|_| Pdfium::bind_to_system_library())?,
+        Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(
+            args.library_directory.path(),
+        ))
+        .or_else(|_| Pdfium::bind_to_system_library())?,
     );
     let pdf_path = args.pdf_path.path().path();
     let document = match pdfium.load_pdf_from_file(pdf_path, args.password.as_deref()) {
@@ -33,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             std::process::exit(3)
         }
-        Err(e) => panic!("{}", e)
+        Err(e) => panic!("{}", e),
     };
     if !args.page_count_only {
         let render_config = PdfRenderConfig::new()
