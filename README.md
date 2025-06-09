@@ -11,12 +11,6 @@ this highly depends on PDF and hardware spec. Tested on macOS 14.0.
 Download the `libpdfium.dylib` file from https://github.com/bblanchon/pdfium-binaries and add it next to the compiled
 `pdf2png` binary or specify `--library-directory`. For the M1/M2 MacBooks, download `pdfium-mac-arm64.tgz`.
 
-Then for macOS add it here:
-
-```bash
-sudo cp libpdfium.dylib /usr/local/lib/
-```
-
 # Compile
 
 ```bash
