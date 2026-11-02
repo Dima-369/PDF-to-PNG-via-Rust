@@ -43,6 +43,14 @@ pub struct Args {
     #[clap(short, long, value_parser = clap::value_parser!(ClioPath).exists().is_dir(), default_value = ".")]
     pub library_directory: ClioPath,
 
+    /// Only convert pages starting at this 0-based page index (inclusive). Combine with --to-page.
+    #[arg(long, conflicts_with = "first_page_only")]
+    pub from_page: Option<u16>,
+
+    /// Only convert pages up to this 0-based page index (inclusive). Combine with --from-page.
+    #[arg(long, conflicts_with = "first_page_only")]
+    pub to_page: Option<u16>,
+
     /// The target width and maximum height in pixels. The width and height of the PNG files will not exceed this value.
     #[arg(short, long, default_value_t = 2000)]
     pub resolution_pixels: u16,

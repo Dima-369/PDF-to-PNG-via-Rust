@@ -42,19 +42,41 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .set_maximum_height(i32::from(args.resolution_pixels));
         let prefix = cli::get_prefix(pdf_path, &args);
         // render each page to a bitmap image, saving each image to a PNG file
-        for (index, page) in document.pages().iter().enumerate() {
+        let page_count = document.pages().len();
+        let from_page = args.from_page.unwrap_or(0);
+        if let Some(to_page) = args.to_page {
+            if from_page > to_page {
+                eprintln!("Warning: --from-page {from_page} is greater than --to-page {to_page}, no pages are converted.");
+            }
+        }
+        let end_page = args.to_page.map_or(page_count, |p| p.saturating_add(1).min(page_count));
+        // only load the requested pages, so a page range of a large PDF stays fast
+        for index in from_page..end_page {
+            let page = document.pages().get(index)?;
             let file_name = if args.first_page_only {
                 format!("{prefix}.png")
             } else {
                 format!("{prefix}-{index}.png")
             };
-            let final_path = args.output_directory.path().join(file_name);
-            page.render_with_config(&render_config)?
+            let final_path = args.output_directory.path().join(&file_name);
+            // write to a temporary file first and rename it, so readers never see a half-written PNG
+            // the process id keeps the temporary file unique when several pdf2png processes write to the same directory
+            // built from the final path, so a --prefix containing slashes keeps the temporary file in the same directory
+            let final_file_name = final_path.file_name().and_then(|n| n.to_str()).unwrap_or(&file_name);
+            let temp_path = final_path.with_file_name(format!(".{final_file_name}.{}.tmp", std::process::id()));
+            let save_result = page.render_with_config(&render_config)?
                 .as_image() // renders this page to an image::DynamicImage
                 .as_rgba8() // convert to an image::Image
                 .ok_or(PdfiumError::ImageError)?
-                .save_with_format(final_path, image::ImageFormat::Png)
-                .map_err(|_| PdfiumError::ImageError)?;
+                .save_with_format(&temp_path, image::ImageFormat::Png);
+            save_result.map_err(|e| {
+                let _ = fs::remove_file(&temp_path);
+                e
+            })?;
+            fs::rename(&temp_path, &final_path).map_err(|e| {
+                let _ = fs::remove_file(&temp_path);
+                e
+            })?;
             if args.first_page_only {
                 break;
             }

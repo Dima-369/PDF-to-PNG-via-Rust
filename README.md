@@ -46,6 +46,10 @@ Options:
           The output directory where all the image files are saved to [default: .]
   -l, --library-directory <LIBRARY_DIRECTORY>
           The directory which contains the libpdfium.dylib file [default: .]
+      --from-page <FROM_PAGE>
+          Only convert pages starting at this 0-based page index (inclusive). Combine with --to-page. Conflicts with --first-page-only
+      --to-page <TO_PAGE>
+          Only convert pages up to this 0-based page index (inclusive). Combine with --from-page. Conflicts with --first-page-only
   -r, --resolution-pixels <RESOLUTION_PIXELS>
           The target width and maximum height in pixels. The width and height of the PNG files will not exceed this value [default: 2000]
   -h, --help
