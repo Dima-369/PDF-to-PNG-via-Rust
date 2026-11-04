@@ -18,6 +18,11 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
+    - name: Download libpdfium for rendering tests
+      # pinned to the pdfium API version pdfium-render 0.8.32 is built against (feature pdfium_7123)
+      run: |
+        curl -fsSL https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7123/pdfium-linux-x64.tgz \
+          | tar -xzf - --strip-components=1 lib/libpdfium.so
     - name: Run tests
       run: cargo test --verbose
     - name: Install cargo-audit

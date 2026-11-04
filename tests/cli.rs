@@ -60,6 +60,8 @@ fn pdfium_dir() -> Option<PathBuf> {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let found = ["libpdfium.dylib", "libpdfium.so", "pdfium.dll"].iter().any(|lib| dir.join(lib).exists());
     if !found {
+        // CI downloads pdfium, so a missing library there means the rendering tests would silently not run
+        assert!(std::env::var_os("CI").is_none(), "no pdfium library in {} on CI", dir.display());
         eprintln!("skipped: no pdfium library in {}", dir.display());
     }
     found.then_some(dir)

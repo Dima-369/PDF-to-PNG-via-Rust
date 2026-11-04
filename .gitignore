@@ -1,3 +1,4 @@
 libpdfium.dylib
 debug/
 target/
+libpdfium.so
