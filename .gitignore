@@ -1,4 +1,3 @@
 libpdfium.dylib
 debug/
 target/
-Cargo.lock
