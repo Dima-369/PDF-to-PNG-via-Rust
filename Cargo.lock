@@ -1082,6 +1082,7 @@ dependencies = [
  "image",
  "pdf-extract",
  "pdfium-render",
+ "tempfile",
 ]
 
 [[package]]
