@@ -124,12 +124,13 @@ fn page_text_json(page: &PdfPage, page_index: u16) -> Result<String, PdfiumError
         let mut is_first = true;
         for char in text.chars().iter() {
             let Some(unicode) = char.unicode_char() else { continue };
-            let char_text = match unicode {
+            let mut char_buffer = [0; 4];
+            let char_text: &str = match unicode {
                 // pdfium ends lines with \r\n, the \n is enough
-                '\r' => String::new(),
+                '\r' => "",
                 // pdfium marks a hyphen at the end of a line like this
-                '\u{2}' => "-".to_string(),
-                _ => unicode.to_string(),
+                '\u{2}' => "-",
+                _ => unicode.encode_utf8(&mut char_buffer),
             };
             let (left, top, right, bottom) = match char.loose_bounds() {
                 Ok(rect) => (rect.left().value, height - rect.top().value, rect.right().value, height - rect.bottom().value),
@@ -139,11 +140,12 @@ fn page_text_json(page: &PdfPage, page_index: u16) -> Result<String, PdfiumError
                 json.push(',');
             }
             is_first = false;
+            json.push('[');
+            push_json_string(&mut json, char_text);
             // writing to a String can not fail
             let _ = write!(
                 json,
-                "[{},{},{},{},{}]",
-                json_string(&char_text),
+                ",{},{},{},{}]",
                 round_points(left),
                 round_points(top),
                 round_points(right),
@@ -162,23 +164,21 @@ fn round_points(value: f32) -> f32 {
     (value * 100.0).round() / 100.0
 }
 
-fn json_string(text: &str) -> String {
-    let mut escaped = String::with_capacity(text.len() + 2);
-    escaped.push('"');
+fn push_json_string(json: &mut String, text: &str) {
+    json.push('"');
     for c in text.chars() {
         match c {
-            '"' => escaped.push_str("\\\""),
-            '\\' => escaped.push_str("\\\\"),
-            '\n' => escaped.push_str("\\n"),
-            '\t' => escaped.push_str("\\t"),
+            '"' => json.push_str("\\\""),
+            '\\' => json.push_str("\\\\"),
+            '\n' => json.push_str("\\n"),
+            '\t' => json.push_str("\\t"),
             c if (c as u32) < 0x20 => {
-                let _ = write!(escaped, "\\u{:04x}", c as u32);
+                let _ = write!(json, "\\u{:04x}", c as u32);
             }
-            c => escaped.push(c),
+            c => json.push(c),
         }
     }
-    escaped.push('"');
-    escaped
+    json.push('"');
 }
 
 /// The 0-based page indices to convert: `from_page..=to_page`, clamped to the pages the PDF has.
@@ -190,7 +190,13 @@ fn page_range(from_page: Option<u16>, to_page: Option<u16>, page_count: u16) -> 
 
 #[cfg(test)]
 mod tests {
-    use super::{json_string, page_range, round_points};
+    use super::{page_range, push_json_string, round_points};
+
+    fn json_string(text: &str) -> String {
+        let mut json = String::new();
+        push_json_string(&mut json, text);
+        json
+    }
 
     #[test]
     fn json_string_escapes_quotes_backslashes_and_control_characters() {
