@@ -22,6 +22,15 @@ pub struct Args {
     #[clap(long, action = ArgAction::SetTrue)]
     pub text_only: bool,
 
+    /// Also write the characters of each converted page with their boxes to a JSON file next to the image, like
+    /// "foo-0.json", so a viewer can select text on the image. The boxes are in points from the top left corner.
+    #[clap(long, action = ArgAction::SetTrue)]
+    pub text_boxes: bool,
+
+    /// Only write the JSON files of --text-boxes, no images, for pages which were converted before.
+    #[clap(long, action = ArgAction::SetTrue, requires = "text_boxes")]
+    pub no_images: bool,
+
     /// The PDF file to convert to images.
     #[clap(value_parser)]
     pub pdf_path: Input,

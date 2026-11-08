@@ -6,6 +6,11 @@ use std::process::{Command, Output};
 
 /// Builds a minimal valid PDF with one Helvetica text line per page.
 fn make_pdf(pages: &[&str]) -> Vec<u8> {
+    make_pdf_with_page_entries(pages, "")
+}
+
+/// Like [`make_pdf`] with additional entries in the dictionary of every page, like `/Rotate 90`.
+fn make_pdf_with_page_entries(pages: &[&str], page_entries: &str) -> Vec<u8> {
     let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
         format!(
@@ -18,7 +23,7 @@ fn make_pdf(pages: &[&str]) -> Vec<u8> {
     for (i, text) in pages.iter().enumerate() {
         let content = format!("BT /F1 24 Tf 72 720 Td ({text}) Tj ET");
         objects.push(format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R >>",
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] {page_entries} /Resources << /Font << /F1 3 0 R >> >> /Contents {} 0 R >>",
             5 + 2 * i
         ));
         objects.push(format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()));
@@ -171,4 +176,79 @@ fn first_page_only_writes_file_without_index_suffix() {
     assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
     assert!(dir.path().join("doc.png").exists());
     assert!(!dir.path().join("doc-1.png").exists());
+}
+
+#[test]
+fn text_boxes_writes_the_characters_with_their_boxes_next_to_the_image() {
+    let Some(lib_dir) = pdfium_dir() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = write_temp_pdf(dir.path(), "doc.pdf", &make_pdf(&["Hi \"you\""]));
+
+    let output = run(&[
+        pdf.as_os_str(),
+        "-o".as_ref(), dir.path().as_os_str(),
+        "-l".as_ref(), lib_dir.as_os_str(),
+        "-r".as_ref(), "200".as_ref(),
+        "--text-boxes".as_ref(),
+    ]);
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(dir.path().join("doc-0.png").exists());
+    let json = std::fs::read_to_string(dir.path().join("doc-0.json")).unwrap();
+    assert!(json.starts_with("{\"width\":612,\"height\":792,\"chars\":[[\"H\","), "got: {json}");
+    assert!(json.contains("[\"\\\"\","), "the quote is escaped, got: {json}");
+    // the text starts 72 points from the left and its baseline is 72 points below the top
+    let first_box: Vec<f32> = json["{\"width\":612,\"height\":792,\"chars\":[[\"H\",".len()..]
+        .split(']')
+        .next()
+        .unwrap()
+        .split(',')
+        .map(|n| n.parse().unwrap())
+        .collect();
+    let [left, top, right, bottom] = first_box[..] else { panic!("got: {first_box:?}") };
+    assert!((left - 72.0).abs() < 2.0 && right > left, "got: {first_box:?}");
+    assert!(top < 72.0 && bottom > top && (bottom - 72.0).abs() < 10.0, "got: {first_box:?}");
+}
+
+#[test]
+fn no_images_writes_only_the_text_boxes() {
+    let Some(lib_dir) = pdfium_dir() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = write_temp_pdf(dir.path(), "doc.pdf", &make_pdf(&["one", "two"]));
+
+    let output = run(&[
+        pdf.as_os_str(),
+        "-o".as_ref(), dir.path().as_os_str(),
+        "-l".as_ref(), lib_dir.as_os_str(),
+        "--text-boxes".as_ref(),
+        "--no-images".as_ref(),
+        "--from-page".as_ref(), "1".as_ref(),
+        "--to-page".as_ref(), "1".as_ref(),
+    ]);
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(dir.path().join("doc-1.json").exists());
+    assert!(!dir.path().join("doc-0.json").exists());
+    assert!(!dir.path().join("doc-1.png").exists());
+}
+
+#[test]
+fn text_boxes_of_a_rotated_page_are_empty_with_a_warning() {
+    let Some(lib_dir) = pdfium_dir() else { return };
+    let dir = tempfile::tempdir().unwrap();
+    let pdf = write_temp_pdf(dir.path(), "doc.pdf", &make_pdf_with_page_entries(&["Hi"], "/Rotate 90"));
+
+    let output = run(&[
+        pdf.as_os_str(),
+        "-o".as_ref(), dir.path().as_os_str(),
+        "-l".as_ref(), lib_dir.as_os_str(),
+        "--text-boxes".as_ref(),
+        "--no-images".as_ref(),
+    ]);
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    assert!(stderr.contains("page 0 is rotated"), "stderr: {stderr}");
+    let json = std::fs::read_to_string(dir.path().join("doc-0.json")).unwrap();
+    assert!(json.ends_with("\"chars\":[]}"), "got: {json}");
 }

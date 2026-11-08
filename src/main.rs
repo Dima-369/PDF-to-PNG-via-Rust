@@ -4,7 +4,9 @@ use clap::Parser;
 use pdfium_render::prelude::PdfiumError::PdfiumLibraryInternalError;
 use pdfium_render::prelude::PdfiumInternalError::PasswordError;
 use pdfium_render::prelude::*;
+use std::fmt::Write as _;
 use std::fs;
+use std::path::{Path, PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Args::parse();
@@ -50,17 +52,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // only load the requested pages, so a page range of a large PDF stays fast
         for index in page_range(args.from_page, args.to_page, document.pages().len()) {
             let page = document.pages().get(index)?;
-            let file_name = if args.first_page_only {
-                format!("{prefix}.png")
+            let file_stem = if args.first_page_only {
+                prefix.clone()
             } else {
-                format!("{prefix}-{index}.png")
+                format!("{prefix}-{index}")
             };
-            let final_path = args.output_directory.path().join(&file_name);
+            if args.text_boxes {
+                let json_path = args.output_directory.path().join(format!("{file_stem}.json"));
+                write_atomically(&json_path, page_text_json(&page, index)?.as_bytes())?;
+            }
+            if args.no_images {
+                if args.first_page_only {
+                    break;
+                }
+                continue;
+            }
+            let final_path = args.output_directory.path().join(format!("{file_stem}.png"));
             // write to a temporary file first and rename it, so readers never see a half-written PNG
-            // the process id keeps the temporary file unique when several pdf2png processes write to the same directory
-            // built from the final path, so a --prefix containing slashes keeps the temporary file in the same directory
-            let final_file_name = final_path.file_name().and_then(|n| n.to_str()).unwrap_or(&file_name);
-            let temp_path = final_path.with_file_name(format!(".{final_file_name}.{}.tmp", std::process::id()));
+            let temp_path = temp_path_of(&final_path);
             let save_result = page.render_with_config(&render_config)?
                 .as_image() // renders this page to an image::DynamicImage
                 .as_rgba8() // convert to an image::Image
@@ -83,6 +92,95 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// The process id keeps the temporary file unique when several pdf2png processes write to the same directory.
+/// Built from the final path, so a --prefix containing slashes keeps the temporary file in the same directory.
+fn temp_path_of(final_path: &Path) -> PathBuf {
+    let final_file_name = final_path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    final_path.with_file_name(format!(".{final_file_name}.{}.tmp", std::process::id()))
+}
+
+/// Writes to a temporary file first and renames it, so readers never see a half-written file.
+fn write_atomically(final_path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let temp_path = temp_path_of(final_path);
+    fs::write(&temp_path, bytes).and_then(|_| fs::rename(&temp_path, final_path)).map_err(|e| {
+        let _ = fs::remove_file(&temp_path);
+        e
+    })
+}
+
+/// The characters of a page with their boxes in points from the top left corner, as JSON:
+/// `{"width":595.28,"height":841.89,"chars":[["H",72,90.5,80.1,104.2],...]}`.
+/// Spaces and line breaks which pdfium adds between text objects have an empty box.
+fn page_text_json(page: &PdfPage, page_index: u16) -> Result<String, PdfiumError> {
+    let height = page.height().value;
+    let mut json = format!(
+        "{{\"width\":{},\"height\":{},\"chars\":[",
+        round_points(page.width().value),
+        round_points(height)
+    );
+    // the boxes are in the coordinates of the unrotated page, which would not match the rotated image
+    if matches!(page.rotation(), Ok(PdfPageRenderRotation::None)) {
+        let text = page.text()?;
+        let mut is_first = true;
+        for char in text.chars().iter() {
+            let Some(unicode) = char.unicode_char() else { continue };
+            let char_text = match unicode {
+                // pdfium ends lines with \r\n, the \n is enough
+                '\r' => String::new(),
+                // pdfium marks a hyphen at the end of a line like this
+                '\u{2}' => "-".to_string(),
+                _ => unicode.to_string(),
+            };
+            let (left, top, right, bottom) = match char.loose_bounds() {
+                Ok(rect) => (rect.left().value, height - rect.top().value, rect.right().value, height - rect.bottom().value),
+                Err(_) => (0.0, 0.0, 0.0, 0.0),
+            };
+            if !is_first {
+                json.push(',');
+            }
+            is_first = false;
+            // writing to a String can not fail
+            let _ = write!(
+                json,
+                "[{},{},{},{},{}]",
+                json_string(&char_text),
+                round_points(left),
+                round_points(top),
+                round_points(right),
+                round_points(bottom)
+            );
+        }
+    } else {
+        eprintln!("Warning: page {page_index} is rotated, it gets no text boxes.");
+    }
+    json.push_str("]}");
+    Ok(json)
+}
+
+/// Two decimals are far below a pixel, and keep the JSON small.
+fn round_points(value: f32) -> f32 {
+    (value * 100.0).round() / 100.0
+}
+
+fn json_string(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len() + 2);
+    escaped.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\t' => escaped.push_str("\\t"),
+            c if (c as u32) < 0x20 => {
+                let _ = write!(escaped, "\\u{:04x}", c as u32);
+            }
+            c => escaped.push(c),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
 /// The 0-based page indices to convert: `from_page..=to_page`, clamped to the pages the PDF has.
 fn page_range(from_page: Option<u16>, to_page: Option<u16>, page_count: u16) -> std::ops::Range<u16> {
     let start = from_page.unwrap_or(0);
@@ -92,7 +190,23 @@ fn page_range(from_page: Option<u16>, to_page: Option<u16>, page_count: u16) -> 
 
 #[cfg(test)]
 mod tests {
-    use super::page_range;
+    use super::{json_string, page_range, round_points};
+
+    #[test]
+    fn json_string_escapes_quotes_backslashes_and_control_characters() {
+        assert_eq!(json_string("a"), "\"a\"");
+        assert_eq!(json_string("\""), "\"\\\"\"");
+        assert_eq!(json_string("\\"), "\"\\\\\"");
+        assert_eq!(json_string("\n"), "\"\\n\"");
+        assert_eq!(json_string("\u{1}"), "\"\\u0001\"");
+        assert_eq!(json_string("ä"), "\"ä\"");
+    }
+
+    #[test]
+    fn round_points_keeps_two_decimals() {
+        assert_eq!(round_points(12.3456), 12.35);
+        assert_eq!(round_points(0.0), 0.0);
+    }
 
     #[test]
     fn page_range_defaults_to_all_pages() {
